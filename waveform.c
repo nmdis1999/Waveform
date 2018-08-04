@@ -61,25 +61,6 @@ void hist_calc(uint8_t *ch, uint8_t *hist)
 	}
 }
 
-void load_data(uint8_t *buf, uint64_t *ptr)
-{
-
-	for (unsigned i = 0; i < NUM_COLS / 2; i++)
-	{
-		unsigned ce = i * 3;
-		unsigned co = (i + NUM_COLS / 2) * 3;
-		uint64_t val = ptr[i];
-
-		buf[ce + 0] = (val >> 56) & 0xFF;
-		buf[ce + 1] = (val >> 48) & 0xFF;
-		buf[ce + 2] = (val >> 40) & 0xFF;
-
-		buf[co + 0] = (val >> 32) & 0xFF;
-		buf[co + 1] = (val >> 24) & 0xFF;
-		buf[co + 2] = (val >> 16) & 0xFF;
-	}
-}
-
 int main(int argc, char **argv)
 {
 	extern int optind;
@@ -172,46 +153,51 @@ int main(int argc, char **argv)
 		}
 	}
 
-	uint16_t hist1[4096] = {0};
-	uint16_t hist2[4096] = {0};
-	uint16_t hist3[4096] = {0};
-	uint16_t hist4[4096] = {0};
+    uint8_t buf[NUM_COLS * 2];
+
+	uint16_t red[NUM_ROWS / 2];
+	uint16_t green1[NUM_ROWS / 2];
+	uint16_t green2[NUM_ROWS / 2];
+	uint16_t blue[NUM_ROWS / 2];
 
 	uint64_t *ptr = base;
 
-	for (unsigned j = 0; j < NUM_ROWS / 2; j++)
-	{
-		for (unsigned i = 0; i < NUM_ROWS * 2; i++)
-		{
-			uint64_t val = *ptr++;
-
-			hist1[(val >> 52) & 0xFFF]++; /* CH0 */
-			hist2[(val >> 40) & 0xFFF]++; /* CH1 */
-			hist3[(val >> 28) & 0xFFF]++; /* CH2 */
-			hist4[(val >> 16) & 0xFFF]++; /* CH3 */
-		}
-
-		ptr += NUM_COLS / 2;
-	}
-
-	unsigned sum = 0;
-
-	/*for (unsigned j = 0; j < 4096; j++)
-		sum += hist1[j] + hist2[j] + hist3[j] + hist4[j];
-
-	printf("%u\n", sum);*/
-
 	FILE *fp;
-
+	
 	char *fName1 = "red.txt";
 	char *fName2 = "green1.txt";
 	char *fName3 = "green2.txt";
 	char *fName4 = "blue.txt";
 
-	write_data(fp = fopen(fName1, "w+"), hist1);
-	write_data(fp = fopen(fName2, "w+"), hist2);
-	write_data(fp = fopen(fName3, "w+"), hist3);
-	write_data(fp = fopen(fName4, "w+"), hist4);
+	for (unsigned j = 0; j < NUM_ROWS / 2; j++)
+	{
+		for (unsigned i = 0; i < NUM_ROWS / 2; i++)
+		{
+			uint64_t val = *ptr++;
+
+			unsigned ce = i * 4;
+
+			buf[ce + 0] = (val >> 52) & 0xFFF; /* CH0 */
+			buf[ce + 1] = (val >> 40) & 0xFFF; /* CH1 */
+			buf[ce + 2] = (val >> 28) & 0xFFF; /* CH2 */
+			buf[ce + 3] = (val >> 16) & 0xFFF; /* CH3 */
+		}
+
+        for (unsigned i = 0; i < NUM_ROWS / 2; i++)
+        {   unsigned ce = i * 4;
+            red[i] = buf[ce + 0];
+            green1[i] = buf[ce + 1];
+            green2[i] = buf[ce + 2];
+            blue[i] = buf[ce + 3];
+        }
+        
+		write_data(fp = fopen(fName1, "w+"), red);
+		write_data(fp = fopen(fName2, "w+"), green1);
+		write_data(fp = fopen(fName3, "w+"), green2);
+		write_data(fp = fopen(fName4, "w+"), blue);
+		exit(0);
+		ptr += NUM_COLS / 2;
+	}
 
 	exit(0);
 }
