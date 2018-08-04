@@ -1,7 +1,7 @@
 /**********************************************************************
 **  waveform.c
 **
-**	Calculating frequency of brightness level of individual channels 
+**	Calculating frequency of brightness level of individual channels
 **  (R, G, B).
 **
 **	Version 1.0
@@ -14,18 +14,18 @@
 **	2 of the License, or (at your option) any later version.
 **
 **********************************************************************/
+#include <errno.h>
+#include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h>
-#include <stdbool.h>
-#include <unistd.h>
 #include <string.h>
-#include <errno.h>
+#include <unistd.h>
 
-#include <sys/mman.h>
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 static char *cmd_name = NULL;
 
@@ -40,17 +40,17 @@ static char *dev_mem = "/dev/mem";
 
 #define ERR_WRITE 1
 
-void write_data(FILE *fp, uint8_t *hist)
+void write_data(FILE *fp, uint16_t hist[4096])
 {
-	if (fp == NULL) {
-    printf("Error while opening the file.\n");
-    exit(0);
-  }
+	if (fp == NULL)
+	{
+		printf("Error while opening the file.\n");
+		exit(0);
+	}
 
-  for (unsigned i = 0; i < 256; i++)
-  fprintf(fp, "%u\t", hist[i]);
-  fclose(fp);
-
+	for (unsigned i = 0; i < 4096; i++)
+		fprintf(fp, "%u\t%u\n", i, hist[i]);
+	fclose(fp);
 }
 
 void hist_calc(uint8_t *ch, uint8_t *hist)
@@ -61,21 +61,23 @@ void hist_calc(uint8_t *ch, uint8_t *hist)
 	}
 }
 
-void load_data(uint8_t *buf, uint64_t *ptr) {
+void load_data(uint8_t *buf, uint64_t *ptr)
+{
 
-  for (unsigned i = 0; i < NUM_COLS / 2; i++) {
-    unsigned ce = i * 3;
-    unsigned co = (i + NUM_COLS / 2) * 3;
-    uint64_t val = ptr[i];
+	for (unsigned i = 0; i < NUM_COLS / 2; i++)
+	{
+		unsigned ce = i * 3;
+		unsigned co = (i + NUM_COLS / 2) * 3;
+		uint64_t val = ptr[i];
 
-    buf[ce + 0] = (val >> 56) & 0xFF;
-    buf[ce + 1] = (val >> 48) & 0xFF;
-    buf[ce + 2] = (val >> 40) & 0xFF;
+		buf[ce + 0] = (val >> 56) & 0xFF;
+		buf[ce + 1] = (val >> 48) & 0xFF;
+		buf[ce + 2] = (val >> 40) & 0xFF;
 
-    buf[co + 0] = (val >> 32) & 0xFF;
-    buf[co + 1] = (val >> 24) & 0xFF;
-    buf[co + 2] = (val >> 16) & 0xFF;
-  }
+		buf[co + 0] = (val >> 32) & 0xFF;
+		buf[co + 1] = (val >> 24) & 0xFF;
+		buf[co + 2] = (val >> 16) & 0xFF;
+	}
 }
 
 int main(int argc, char **argv)
@@ -132,8 +134,7 @@ int main(int argc, char **argv)
 	if (fd == -1)
 	{
 		fprintf(stderr,
-				"error opening >%s<.\n%s\n",
-				dev_mem, strerror(errno));
+				"error opening >%s<.\n%s\n", dev_mem, strerror(errno));
 		exit(2);
 	}
 
@@ -141,15 +142,13 @@ int main(int argc, char **argv)
 		map_addr = map_base;
 
 	/* Mapping base */
-	void *base = mmap((void *)map_addr, map_size,
-					  PROT_READ | PROT_WRITE, MAP_SHARED,
-					  fd, map_base);
+	void *base = mmap((void *)map_addr, map_size, PROT_READ | PROT_WRITE,
+					  MAP_SHARED, fd, map_base);
 	if (base == (void *)-1)
 	{
 		fprintf(stderr,
-				"error mapping 0x%08X+0x%08X @0x%08X.\n%s\n",
-				map_base, map_size, map_addr,
-				strerror(errno));
+				"error mapping 0x%08X+0x%08X @0x%08X.\n%s\n", map_base,
+				map_size, map_addr, strerror(errno));
 		exit(2);
 	}
 
@@ -167,53 +166,52 @@ int main(int argc, char **argv)
 		if (fd == -1)
 		{
 			fprintf(stderr,
-					"error opening >%s< for writing.\n%s\n",
-					argv[optind], strerror(errno));
+					"error opening >%s< for writing.\n%s\n", argv[optind],
+					strerror(errno));
 			exit(2);
 		}
 	}
 
-	uint8_t buf[NUM_COLS * 3];
-    uint8_t red[NUM_ROWS], green1[NUM_ROWS], green2[NUM_ROWS], blue[NUM_ROWS];
-	uint8_t greenAvg[NUM_ROWS];
+	uint16_t hist1[4096] = {0};
+	uint16_t hist2[4096] = {0};
+	uint16_t hist3[4096] = {0};
+	uint16_t hist4[4096] = {0};
+
 	uint64_t *ptr = base;
-	uint8_t hist1[256], hist2[256], hist3[256];
 
-	for (unsigned i = 0; i < 256; i++)
-	{
-		hist1[i] = 0;
-		hist2[i] = 0;
-		hist3[i] = 0;
-	}
-
-	char *fhist1 = "hist1.txt";
-	char *fhist2 = "hist2.txt";
-	char *fhist3 =  "hist3.txt";
-
-	FILE *fp;
 	for (unsigned j = 0; j < NUM_ROWS / 2; j++)
 	{
+		for (unsigned i = 0; i < NUM_ROWS * 2; i++)
+		{
+			uint64_t val = *ptr++;
 
-		load_data(buf, ptr);
-        for (unsigned i = 0; i < NUM_ROWS; i++)
-        {   unsigned ce = i * 4;
-            red[i] = buf[ce];
-            green1[i] = buf[ce+1];
-            green2[i] = buf[ce+2];
-			greenAvg[i] = ( green1[i] +  green2[i] ) / 2;
-            blue[i] = buf[ce + 3];
+			hist1[(val >> 52) & 0xFFF]++; /* CH0 */
+			hist2[(val >> 40) & 0xFFF]++; /* CH1 */
+			hist3[(val >> 28) & 0xFFF]++; /* CH2 */
+			hist4[(val >> 16) & 0xFFF]++; /* CH3 */
+		}
 
-        }
-		hist_calc(red ,hist1);
-		write_data(fp=fopen(fhist1, "w+"), hist1);
-		hist_calc(greenAvg, hist2);
-		write_data(fp=fopen(fhist2, "w+"), hist2);
-		hist_calc(blue, hist3);
-		write_data(fp=fopen(fhist3, "w+"), hist3);
-	
 		ptr += NUM_COLS / 2;
 	}
 
+	unsigned sum = 0;
+
+	/*for (unsigned j = 0; j < 4096; j++)
+		sum += hist1[j] + hist2[j] + hist3[j] + hist4[j];
+
+	printf("%u\n", sum);*/
+
+	FILE *fp;
+
+	char *fName1 = "red.txt";
+	char *fName2 = "green1.txt";
+	char *fName3 = "green2.txt";
+	char *fName4 = "blue.txt";
+
+	write_data(fp = fopen(fName1, "w+"), hist1);
+	write_data(fp = fopen(fName2, "w+"), hist2);
+	write_data(fp = fopen(fName3, "w+"), hist3);
+	write_data(fp = fopen(fName4, "w+"), hist4);
+
 	exit(0);
 }
- 
