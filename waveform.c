@@ -38,8 +38,6 @@ static char *dev_mem = "/dev/mem";
 #define NUM_COLS 4096
 #define NUM_ROWS 3072
 
-#define ERR_WRITE 1
-
 void write_data(FILE *fp, uint16_t hist[4096])
 {
     if (fp == NULL)
@@ -51,14 +49,6 @@ void write_data(FILE *fp, uint16_t hist[4096])
     for (unsigned i = 0; i < 4096; i++)
         fprintf(fp, "%u\t%u\n", i, hist[i]);
     fclose(fp);
-}
-
-void hist_calc(uint8_t *ch, uint8_t *hist)
-{
-    for (unsigned i = 0; i < NUM_ROWS; i++)
-    {
-        hist[ch[i]]++;
-    }
 }
 
 int main(int argc, char **argv)
